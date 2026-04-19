@@ -9,6 +9,7 @@ import {
   fallbackWishlist,
   type AnniversaryCard,
   type CapsuleCard,
+  type CoupleInvite,
   type DiaryMoment,
   type GalleryCard,
   type HomepageSnapshot,
@@ -311,5 +312,42 @@ export async function getSharedCollection(slug: string): Promise<SharedCollectio
     description: shareLink.description ?? "一组公开分享的回忆照片。",
     createdAt: shareLink.created_at,
     items: items.slice(0, 6),
+  };
+}
+
+export async function getInviteByToken(token: string): Promise<CoupleInvite | null> {
+  if (!supabaseReady()) {
+    return null;
+  }
+
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from("couple_invites")
+    .select("id,token,couple_id,invited_by,note,expires_at,accepted_at")
+    .eq("token", token)
+    .maybeSingle();
+
+  if (error || !data) return null;
+
+  const [{ data: couple }, { data: inviterProfile }] = await Promise.all([
+    supabase.from("couples").select("title").eq("id", data.couple_id).maybeSingle(),
+    supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", data.invited_by)
+      .maybeSingle(),
+  ]);
+
+  return {
+    id: data.id,
+    token: data.token,
+    coupleId: data.couple_id,
+    coupleTitle: couple?.title ?? "心动存档",
+    inviterName: inviterProfile?.display_name ?? "你的对象",
+    expiresAt: data.expires_at,
+    acceptedAt: data.accepted_at,
+    note: data.note,
   };
 }

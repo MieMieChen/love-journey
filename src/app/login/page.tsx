@@ -4,8 +4,13 @@ import { LoginForm } from "@/components/login-form";
 import { PaperCard } from "@/components/paper-card";
 import { getViewerState } from "@/lib/auth";
 
-export default async function LoginPage() {
+type LoginPageProps = {
+  searchParams: Promise<{ next?: string }>;
+};
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
   const viewer = await getViewerState();
+  const { next } = await searchParams;
 
   if (viewer.user && viewer.coupleId) {
     redirect("/");
@@ -24,7 +29,7 @@ export default async function LoginPage() {
       >
         <div className="grid gap-8 lg:grid-cols-[1fr_0.9fr]">
           <div>
-            <LoginForm />
+            <LoginForm next={next} />
           </div>
           <div className="rounded-[26px] border border-dashed border-[var(--line)] bg-white/40 p-5 text-sm leading-7 text-[var(--ink-soft)]">
             <p className="font-medium text-[var(--ink)]">登录后会解锁：</p>

@@ -110,6 +110,17 @@ create table if not exists public.share_links (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.couple_invites (
+  id uuid primary key default gen_random_uuid(),
+  couple_id uuid not null references public.couples (id) on delete cascade,
+  invited_by uuid not null references public.profiles (id) on delete cascade,
+  token text unique not null,
+  note text,
+  expires_at timestamptz not null,
+  accepted_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
 alter table public.couples enable row level security;
 alter table public.profiles enable row level security;
 alter table public.couple_members enable row level security;
@@ -120,6 +131,7 @@ alter table public.anniversaries enable row level security;
 alter table public.capsules enable row level security;
 alter table public.wishlists enable row level security;
 alter table public.share_links enable row level security;
+alter table public.couple_invites enable row level security;
 
 insert into storage.buckets (id, name, public)
 values ('moment-photos', 'moment-photos', false)
@@ -309,6 +321,47 @@ with check (
     where cm.couple_id = share_links.couple_id
       and cm.profile_id = auth.uid()
   )
+);
+
+create policy "members can read their invites"
+on public.couple_invites for select
+using (
+  exists (
+    select 1
+    from public.couple_members cm
+    where cm.couple_id = couple_invites.couple_id
+      and cm.profile_id = auth.uid()
+  )
+);
+
+create policy "members can create invites"
+on public.couple_invites for insert
+with check (
+  exists (
+    select 1
+    from public.couple_members cm
+    where cm.couple_id = couple_invites.couple_id
+      and cm.profile_id = auth.uid()
+  )
+);
+
+create policy "authenticated users can read active invites by token"
+on public.couple_invites for select
+to authenticated
+using (
+  accepted_at is null
+  and expires_at > now()
+);
+
+create policy "authenticated users can accept invites"
+on public.couple_invites for update
+to authenticated
+using (
+  accepted_at is null
+  and expires_at > now()
+)
+with check (
+  accepted_at is not null
 );
 
 create policy "authenticated users can upload private photos"

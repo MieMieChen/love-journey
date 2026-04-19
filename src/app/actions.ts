@@ -254,3 +254,90 @@ export async function createShareLinkAction(formData: FormData) {
   revalidatePath("/gallery");
   redirect(`/share/${slug}`);
 }
+
+export async function createInviteAction(formData: FormData) {
+  const { supabase, user, coupleId } = await requireAuthenticatedMember();
+  const note = textValue(formData, "note");
+  const expiresInDays = Number(textValue(formData, "expiresInDays")) || 7;
+  const token = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString();
+
+  const { error } = await supabase.from("couple_invites").insert({
+    couple_id: coupleId,
+    invited_by: user.id,
+    token,
+    note: note || null,
+    expires_at: expiresAt,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  redirect(`/?inviteToken=${token}`);
+}
+
+export async function acceptInviteAction(formData: FormData) {
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) redirect("/");
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const token = textValue(formData, "token");
+
+  if (!user) {
+    redirect(`/login?next=${encodeURIComponent(`/invite/${token}`)}`);
+  }
+
+  const displayName = textValue(formData, "displayName") || user.email?.split("@")[0] || "我们";
+
+  const { data: invite } = await supabase
+    .from("couple_invites")
+    .select("id,couple_id,accepted_at,expires_at")
+    .eq("token", token)
+    .maybeSingle();
+
+  if (!invite) {
+    throw new Error("邀请不存在或已经失效。");
+  }
+
+  if (invite.accepted_at) {
+    redirect("/");
+  }
+
+  if (new Date(invite.expires_at).getTime() < Date.now()) {
+    throw new Error("邀请已经过期，请让对方重新生成新的邀请链接。");
+  }
+
+  const { error: profileError } = await supabase.from("profiles").upsert({
+    id: user.id,
+    display_name: displayName,
+  });
+
+  if (profileError) {
+    throw new Error(profileError.message);
+  }
+
+  const { error: memberError } = await supabase.from("couple_members").upsert({
+    couple_id: invite.couple_id,
+    profile_id: user.id,
+    role: "member",
+  });
+
+  if (memberError) {
+    throw new Error(memberError.message);
+  }
+
+  const { error: inviteError } = await supabase
+    .from("couple_invites")
+    .update({ accepted_at: new Date().toISOString() })
+    .eq("id", invite.id);
+
+  if (inviteError) {
+    throw new Error(inviteError.message);
+  }
+
+  redirect("/");
+}

@@ -76,6 +76,17 @@ export type SharedCollection = {
   items: GalleryCard[];
 };
 
+export type CoupleInvite = {
+  id: string;
+  token: string;
+  coupleId: string;
+  coupleTitle: string;
+  inviterName: string;
+  expiresAt: string;
+  acceptedAt?: string | null;
+  note?: string | null;
+};
+
 export const fallbackSnapshot: HomepageSnapshot = {
   daysTogether: 428,
   cityCount: 8,

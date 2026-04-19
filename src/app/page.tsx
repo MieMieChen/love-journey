@@ -1,9 +1,10 @@
 import Image from "next/image";
 import Link from "next/link";
 
+import { createInviteAction } from "@/app/actions";
 import { PaperCard } from "@/components/paper-card";
 import { SiteShell } from "@/components/site-shell";
-import { getViewerState } from "@/lib/auth";
+import { getBaseUrl, getViewerState } from "@/lib/auth";
 import {
   getAnniversaryCards,
   getGalleryHighlights,
@@ -13,7 +14,11 @@ import {
 } from "@/lib/queries";
 import { formatDate, formatDaysFromNow } from "@/lib/site-data";
 
-export default async function HomePage() {
+type HomePageProps = {
+  searchParams: Promise<{ inviteToken?: string }>;
+};
+
+export default async function HomePage({ searchParams }: HomePageProps) {
   const [snapshot, anniversaries, gallery, places, wishes, viewer] = await Promise.all([
     getHomepageSnapshot(),
     getAnniversaryCards(),
@@ -22,8 +27,10 @@ export default async function HomePage() {
     getWishlistItems(),
     getViewerState(),
   ]);
+  const { inviteToken } = await searchParams;
 
   const nextAnniversary = anniversaries[0];
+  const inviteUrl = inviteToken ? `${getBaseUrl()}/invite/${inviteToken}` : null;
 
   return (
     <SiteShell
@@ -88,6 +95,53 @@ export default async function HomePage() {
           <Link href="/onboarding" className="primary-button">
             去完成加入设置
           </Link>
+        </PaperCard>
+      )}
+
+      {viewer.configured && viewer.user && viewer.coupleId && (
+        <PaperCard
+          tone="blush"
+          title="邀请对象加入同一个双人空间"
+          description="生成一条专属邀请链接，对方打开后登录并确认加入，就会进入和你同一个恋爱手账空间。"
+        >
+          <div className="grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
+            <form action={createInviteAction} className="space-y-4">
+              <textarea
+                name="note"
+                placeholder="可选：给这条邀请留一句话，比如‘点开后就能一起写我们的日记了’"
+                className="input-field min-h-28"
+              />
+              <select name="expiresInDays" className="input-field">
+                <option value="3">3 天后过期</option>
+                <option value="7">7 天后过期</option>
+                <option value="14">14 天后过期</option>
+              </select>
+              <button type="submit" className="primary-button">
+                生成邀请链接
+              </button>
+            </form>
+
+            <div className="rounded-[24px] border border-dashed border-[var(--line)] bg-white/45 p-5 text-sm leading-7 text-[var(--ink-soft)]">
+              <p className="font-medium text-[var(--ink)]">使用方式</p>
+              <p className="mt-2">
+                生成后，把链接发给对象。对象打开邀请页后，如果还没登录，会先进入登录页，登录成功后会自动回到邀请页并加入同一个空间。
+              </p>
+              <p className="mt-3">
+                当前网站基地址：
+                <span className="mt-2 block rounded-[16px] bg-white/70 px-3 py-2 font-mono text-xs text-[var(--ink)]">
+                  {getBaseUrl()}
+                </span>
+              </p>
+              {inviteUrl && (
+                <div className="mt-4 rounded-[18px] border border-white/70 bg-white/75 p-4">
+                  <p className="text-sm font-medium text-[var(--ink)]">刚生成的邀请链接</p>
+                  <p className="mt-2 break-all font-mono text-xs text-[var(--ink-soft)]">
+                    {inviteUrl}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
         </PaperCard>
       )}
 

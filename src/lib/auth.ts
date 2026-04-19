@@ -16,6 +16,16 @@ export function getStorageBucketName() {
   return process.env.SUPABASE_STORAGE_BUCKET || "moment-photos";
 }
 
+export function getBaseUrl() {
+  const candidate =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+    process.env.VERCEL_URL ||
+    "http://localhost:3000";
+
+  return candidate.startsWith("http") ? candidate : `https://${candidate}`;
+}
+
 export async function getViewerState() {
   if (!supabaseConfigured()) {
     return {
